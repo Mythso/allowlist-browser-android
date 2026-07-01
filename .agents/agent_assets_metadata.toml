@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "9k4Vvzk5JQq2bIiMc-ji2"
+uri = "file://artifacts/allowlist-browser/assets/images/icon.png"
+type = "image"
+title = "generated_image"
