@@ -59,9 +59,9 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_ALLOWLIST_URL =
-  "https://raw.githubusercontent.com/YOURUSERNAME/YOURREPO/main/allowlist.csv";
+  "https://raw.githubusercontent.com/Mythso/allowlist-browser-android/main/allowlist.csv";
 const DEFAULT_BLACKLIST_URL =
-  "https://raw.githubusercontent.com/YOURUSERNAME/YOURREPO/main/blacklist.csv";
+  "https://raw.githubusercontent.com/Mythso/allowlist-browser-android/main/blacklist.csv";
 
 const BUILTIN_ALLOWLIST: Array<{ domain: string; reason: string }> = [
   { domain: "duckduckgo.com", reason: "Standard søkemotor / Default search engine" },
@@ -138,8 +138,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (savedFavorites) setFavorites(JSON.parse(savedFavorites));
         if (savedReported)
           setReportedDomains(new Set(JSON.parse(savedReported)));
-        if (savedAllowlistUrl) setAllowlistUrlState(savedAllowlistUrl);
-        if (savedBlacklistUrl) setBlacklistUrlState(savedBlacklistUrl);
+        if (savedAllowlistUrl && !savedAllowlistUrl.includes("YOURUSERNAME"))
+          setAllowlistUrlState(savedAllowlistUrl);
+        if (savedBlacklistUrl && !savedBlacklistUrl.includes("YOURUSERNAME"))
+          setBlacklistUrlState(savedBlacklistUrl);
         if (savedLastUpdated) setLastUpdated(Number(savedLastUpdated));
 
         if (savedAllowlist) {
