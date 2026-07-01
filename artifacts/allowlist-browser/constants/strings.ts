@@ -11,36 +11,35 @@ export interface Strings {
     searchPlaceholder: string;
     quickAccess: string;
     noFavorites: string;
-    noFavoritesHint: string;
   };
   states: {
     allowed: string;
-    allowedTap: string;
     blacklisted: string;
     pending: string;
     notApproved: string;
   };
   actions: {
     reportSafe: string;
-    addFavorite: string;
     removeFavorite: string;
     goBack: string;
-    refresh: string;
     updateLists: string;
     exportFavorites: string;
-    copy: string;
-    ok: string;
     cancel: string;
+    submit: string;
   };
   blocked: {
     blacklistedTitle: string;
     blacklistedSubtitle: string;
     blacklistedReason: string;
+    reportWrongBlacklist: string;
     pendingTitle: string;
     pendingSubtitle: string;
     pendingHint: string;
     notApprovedTitle: string;
     notApprovedSubtitle: string;
+    reportFormLabel: string;
+    reportFormPlaceholder: string;
+    reportSubmit: string;
     reportedMessage: string;
   };
   favorites: {
@@ -67,10 +66,25 @@ export interface Strings {
     csvUrlHint: string;
     favoritesSection: string;
     exportButton: string;
-    aboutSection: string;
+    statsSection: string;
     allowlistCount: string;
     blacklistCount: string;
     pendingCount: string;
+    reportSection: string;
+    reportUrlLabel: string;
+    reportUrlPlaceholder: string;
+    reportReasonLabel: string;
+    reportReasonPlaceholder: string;
+    reportSubmitBtn: string;
+    reportSuccess: string;
+    myReportsSection: string;
+    noReports: string;
+    reportTypeLabels: {
+      safe: string;
+      wrong_blacklist: string;
+      wrong_allowlist: string;
+    };
+    deleteReport: string;
   };
 }
 
@@ -85,37 +99,36 @@ const no: Strings = {
     searchPlaceholder: "Søk eller skriv inn adresse",
     quickAccess: "Hurtigtilgang",
     noFavorites: "Ingen favoritter ennå",
-    noFavoritesHint: "Besøk en godkjent nettside og trykk på stjerneikonet for å legge til.",
   },
   states: {
     allowed: "Godkjent",
-    allowedTap: "Trykk for å se begrunnelse",
     blacklisted: "Blokkert",
     pending: "Venter på vurdering",
     notApproved: "Ikke godkjent",
   },
   actions: {
     reportSafe: "Rapporter som trygg",
-    addFavorite: "Legg til i favoritter",
-    removeFavorite: "Fjern fra favoritter",
-    goBack: "Gå tilbake",
-    refresh: "Oppdater",
+    removeFavorite: "Fjern",
+    goBack: "Tilbake",
     updateLists: "Oppdater lister",
     exportFavorites: "Eksporter favoritter",
-    copy: "Kopier",
-    ok: "OK",
     cancel: "Avbryt",
+    submit: "Send inn",
   },
   blocked: {
     blacklistedTitle: "Blokkert",
-    blacklistedSubtitle: "Denne nettsiden er svartelistet",
-    blacklistedReason: "Begrunnelse",
+    blacklistedSubtitle: "Denne nettsiden er svartelistet.",
+    blacklistedReason: "Årsak",
+    reportWrongBlacklist: "Rapporter feil – ikke burde vært blokkert",
     pendingTitle: "Venter på vurdering",
-    pendingSubtitle: "Denne nettsiden er rapportert og venter på godkjenning.",
-    pendingHint: "Listen oppdateres jevnlig. Du kan prøve igjen etter en oppdatering.",
+    pendingSubtitle: "Nettsiden er rapportert og venter på gjennomgang.",
+    pendingHint: "Listene oppdateres jevnlig. Prøv igjen etter en oppdatering.",
     notApprovedTitle: "Ikke godkjent",
     notApprovedSubtitle: "Denne nettsiden er ikke på godkjenningslisten.",
-    reportedMessage: "Nettsiden er rapportert som trygg og venter på vurdering.",
+    reportFormLabel: "Begrunn rapporten (valgfritt)",
+    reportFormPlaceholder: "Hvorfor bør denne siden godkjennes / fjernes?",
+    reportSubmit: "Send rapport",
+    reportedMessage: "Rapport sendt. Vi vurderer nettsiden.",
   },
   favorites: {
     title: "Favoritter",
@@ -128,23 +141,38 @@ const no: Strings = {
     title: "Innstillinger",
     languageSection: "Språk",
     languageNorwegian: "Norsk",
-    languageEnglish: "Engelsk",
-    listsSection: "Godkjenningslister",
+    languageEnglish: "English",
+    listsSection: "Lister",
     updateButton: "Oppdater lister nå",
     lastUpdated: "Sist oppdatert",
     never: "Aldri",
-    updating: "Oppdaterer...",
+    updating: "Oppdaterer…",
     updateSuccess: "Lister oppdatert",
-    updateFailed: "Oppdatering mislyktes",
-    allowlistUrl: "URL til godkjenningsliste (CSV)",
-    blacklistUrl: "URL til svarteliste (CSV)",
-    csvUrlHint: "Raw GitHub URL til CSV-filen",
+    updateFailed: "Kunne ikke hente lister. Sjekk URL-ene.",
+    allowlistUrl: "URL – godkjenningsliste",
+    blacklistUrl: "URL – svarteliste",
+    csvUrlHint: "Raw GitHub-URL til CSV-filen",
     favoritesSection: "Favoritter",
     exportButton: "Eksporter favoritter",
-    aboutSection: "Oversikt",
-    allowlistCount: "Godkjente nettsider",
-    blacklistCount: "Svartelistede nettsider",
+    statsSection: "Status",
+    allowlistCount: "Godkjente sider",
+    blacklistCount: "Blokkerte sider",
     pendingCount: "Venter på vurdering",
+    reportSection: "Rapporter en godkjent side",
+    reportUrlLabel: "Nettadresse",
+    reportUrlPlaceholder: "f.eks. nettsted.no",
+    reportReasonLabel: "Hvorfor burde den ikke være godkjent?",
+    reportReasonPlaceholder: "Beskriv problemet…",
+    reportSubmitBtn: "Send rapport",
+    reportSuccess: "Rapport sendt",
+    myReportsSection: "Mine rapporter",
+    noReports: "Ingen rapporter sendt",
+    reportTypeLabels: {
+      safe: "Rapportert som trygg",
+      wrong_blacklist: "Rapportert feil blokkert",
+      wrong_allowlist: "Rapportert feil godkjent",
+    },
+    deleteReport: "Slett",
   },
 };
 
@@ -159,37 +187,36 @@ const en: Strings = {
     searchPlaceholder: "Search or enter address",
     quickAccess: "Quick Access",
     noFavorites: "No favorites yet",
-    noFavoritesHint: "Visit an approved site and tap the star icon to add it.",
   },
   states: {
     allowed: "Approved",
-    allowedTap: "Tap for reason",
     blacklisted: "Blacklisted",
     pending: "Pending approval",
-    notApproved: "Not on Allow List",
+    notApproved: "Not approved",
   },
   actions: {
     reportSafe: "Report as Safe",
-    addFavorite: "Add to Favorites",
-    removeFavorite: "Remove from Favorites",
-    goBack: "Go Back",
-    refresh: "Refresh",
+    removeFavorite: "Remove",
+    goBack: "Back",
     updateLists: "Update Lists",
     exportFavorites: "Export Favorites",
-    copy: "Copy",
-    ok: "OK",
     cancel: "Cancel",
+    submit: "Submit",
   },
   blocked: {
     blacklistedTitle: "Blacklisted",
-    blacklistedSubtitle: "This website has been blacklisted",
+    blacklistedSubtitle: "This website has been blacklisted.",
     blacklistedReason: "Reason",
+    reportWrongBlacklist: "Report error — should not be blocked",
     pendingTitle: "Pending Approval",
-    pendingSubtitle: "This website has been reported and is awaiting approval.",
-    pendingHint: "The list is updated regularly. You can try again after an update.",
+    pendingSubtitle: "This website has been reported and is awaiting review.",
+    pendingHint: "Lists are updated regularly. Try again after an update.",
     notApprovedTitle: "Not Approved",
     notApprovedSubtitle: "This website is not on the allow list.",
-    reportedMessage: "The website has been reported as safe and is pending review.",
+    reportFormLabel: "Reason for report (optional)",
+    reportFormPlaceholder: "Why should this site be approved / removed?",
+    reportSubmit: "Submit report",
+    reportedMessage: "Report submitted. We will review the website.",
   },
   favorites: {
     title: "Favorites",
@@ -201,24 +228,39 @@ const en: Strings = {
   settings: {
     title: "Settings",
     languageSection: "Language",
-    languageNorwegian: "Norwegian",
+    languageNorwegian: "Norsk",
     languageEnglish: "English",
-    listsSection: "Allow Lists",
+    listsSection: "Lists",
     updateButton: "Update Lists Now",
     lastUpdated: "Last updated",
     never: "Never",
-    updating: "Updating...",
+    updating: "Updating…",
     updateSuccess: "Lists updated",
-    updateFailed: "Update failed",
-    allowlistUrl: "Allow List URL (CSV)",
-    blacklistUrl: "Blacklist URL (CSV)",
+    updateFailed: "Could not fetch lists. Check the URLs.",
+    allowlistUrl: "Allow list URL",
+    blacklistUrl: "Blacklist URL",
     csvUrlHint: "Raw GitHub URL to the CSV file",
     favoritesSection: "Favorites",
     exportButton: "Export Favorites",
-    aboutSection: "Overview",
+    statsSection: "Status",
     allowlistCount: "Approved sites",
-    blacklistCount: "Blacklisted sites",
+    blacklistCount: "Blocked sites",
     pendingCount: "Pending review",
+    reportSection: "Report an approved site",
+    reportUrlLabel: "Website address",
+    reportUrlPlaceholder: "e.g. website.com",
+    reportReasonLabel: "Why should it not be approved?",
+    reportReasonPlaceholder: "Describe the issue…",
+    reportSubmitBtn: "Submit report",
+    reportSuccess: "Report submitted",
+    myReportsSection: "My Reports",
+    noReports: "No reports submitted",
+    reportTypeLabels: {
+      safe: "Reported as safe",
+      wrong_blacklist: "Reported wrong block",
+      wrong_allowlist: "Reported wrong approval",
+    },
+    deleteReport: "Delete",
   },
 };
 

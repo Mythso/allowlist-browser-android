@@ -26,10 +26,7 @@ export default function StartPage({ onNavigate }: StartPageProps) {
   const [input, setInput] = useState("");
   const [focused, setFocused] = useState(false);
 
-  const topPad =
-    Platform.OS === "web"
-      ? Math.max(insets.top, 67)
-      : insets.top;
+  const topPad = Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
 
   const handleSubmit = () => {
     if (input.trim()) {
@@ -43,19 +40,13 @@ export default function StartPage({ onNavigate }: StartPageProps) {
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={[
         styles.content,
-        { paddingTop: topPad + 24, paddingBottom: insets.bottom + 100 },
+        { paddingTop: topPad + 32, paddingBottom: insets.bottom + 120 },
       ]}
       keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
     >
       <View style={styles.header}>
-        <View
-          style={[
-            styles.logoCircle,
-            { backgroundColor: colors.primary },
-          ]}
-        >
-          <Feather name="shield" size={28} color="#fff" />
-        </View>
+        <Feather name="shield" size={28} color={colors.primary} />
         <Text style={[styles.title, { color: colors.foreground }]}>
           {strings.home.startTitle}
         </Text>
@@ -67,13 +58,12 @@ export default function StartPage({ onNavigate }: StartPageProps) {
           {
             backgroundColor: colors.card,
             borderColor: focused ? colors.primary : colors.border,
-            shadowColor: colors.primary,
           },
         ]}
       >
         <Feather
           name="search"
-          size={18}
+          size={16}
           color={focused ? colors.primary : colors.mutedForeground}
         />
         <TextInput
@@ -90,34 +80,34 @@ export default function StartPage({ onNavigate }: StartPageProps) {
           keyboardType="url"
           returnKeyType="go"
         />
-        {input.length > 0 && (
-          <TouchableOpacity onPress={handleSubmit} style={styles.goBtn}>
-            <View style={[styles.goBtnInner, { backgroundColor: colors.primary }]}>
-              <Feather name="arrow-right" size={16} color="#fff" />
-            </View>
-          </TouchableOpacity>
-        )}
       </View>
 
-      {favorites.length > 0 && (
+      {favorites.length > 0 ? (
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
+          <Text
+            style={[styles.sectionLabel, { color: colors.mutedForeground }]}
+          >
             {strings.home.quickAccess}
           </Text>
           <View style={styles.grid}>
             {favorites.map((fav) => (
               <TouchableOpacity
                 key={fav.id}
-                style={[styles.gridItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+                style={[
+                  styles.gridItem,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                  },
+                ]}
                 onPress={() => onNavigate(fav.url)}
-                activeOpacity={0.7}
+                activeOpacity={0.6}
               >
                 <Image
                   source={{
                     uri: `https://www.google.com/s2/favicons?domain=${fav.domain}&sz=64`,
                   }}
                   style={styles.favicon}
-                  defaultSource={undefined}
                 />
                 <Text
                   style={[styles.gridLabel, { color: colors.foreground }]}
@@ -129,16 +119,10 @@ export default function StartPage({ onNavigate }: StartPageProps) {
             ))}
           </View>
         </View>
-      )}
-
-      {favorites.length === 0 && (
-        <View style={styles.emptyState}>
-          <Feather name="star" size={32} color={colors.mutedForeground} />
-          <Text style={[styles.emptyTitle, { color: colors.mutedForeground }]}>
+      ) : (
+        <View style={styles.empty}>
+          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
             {strings.home.noFavorites}
-          </Text>
-          <Text style={[styles.emptyHint, { color: colors.mutedForeground }]}>
-            {strings.home.noFavoritesHint}
           </Text>
         </View>
       )}
@@ -147,78 +131,51 @@ export default function StartPage({ onNavigate }: StartPageProps) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   content: {
     paddingHorizontal: 20,
-    alignItems: "stretch",
+    gap: 20,
   },
   header: {
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 32,
-    gap: 12,
-  },
-  logoCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
+    gap: 10,
   },
   title: {
-    fontSize: 24,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -0.5,
+    fontSize: 22,
+    fontFamily: "Inter_600SemiBold",
   },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 16,
-    borderWidth: 1.5,
-    paddingHorizontal: 16,
-    height: 54,
-    gap: 10,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
-    marginBottom: 32,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    height: 44,
+    gap: 8,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: "Inter_400Regular",
     paddingVertical: 0,
   },
-  goBtn: {
-    padding: 2,
-  },
-  goBtnInner: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  section: {
-    gap: 12,
-  },
-  sectionTitle: {
+  section: { gap: 10 },
+  sectionLabel: {
     fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "Inter_500Medium",
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 10,
   },
   gridItem: {
     width: "30%",
     aspectRatio: 1,
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
@@ -226,30 +183,22 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   favicon: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: "#f0f0f0",
   },
   gridLabel: {
     fontSize: 11,
     fontFamily: "Inter_500Medium",
     textAlign: "center",
   },
-  emptyState: {
-    alignItems: "center",
-    gap: 10,
-    paddingTop: 32,
-    opacity: 0.5,
+  empty: {
+    paddingTop: 20,
   },
-  emptyTitle: {
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-  },
-  emptyHint: {
-    fontSize: 13,
+  emptyText: {
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
-    lineHeight: 20,
-    paddingHorizontal: 20,
   },
 });

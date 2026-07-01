@@ -5,7 +5,7 @@ import { Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { Platform, StyleSheet, useColorScheme, View } from "react-native";
 
 import { useAppContext } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
@@ -33,10 +33,8 @@ function NativeTabLayout() {
 function ClassicTabLayout() {
   const colors = useColors();
   const { strings } = useAppContext();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const isDark = useColorScheme() === "dark";
   const isIOS = Platform.OS === "ios";
-  const isWeb = Platform.OS === "web";
 
   return (
     <Tabs
@@ -45,6 +43,7 @@ function ClassicTabLayout() {
         tabBarInactiveTintColor: colors.mutedForeground,
         headerShown: true,
         headerStyle: { backgroundColor: colors.card },
+        headerShadowVisible: false,
         headerTintColor: colors.foreground,
         headerTitleStyle: {
           fontFamily: "Inter_600SemiBold",
@@ -56,7 +55,7 @@ function ClassicTabLayout() {
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: colors.border,
           elevation: 0,
-          ...(isWeb ? { height: 84 } : {}),
+          shadowOpacity: 0,
         },
         tabBarLabelStyle: {
           fontFamily: "Inter_500Medium",
@@ -65,18 +64,15 @@ function ClassicTabLayout() {
         tabBarBackground: () =>
           isIOS ? (
             <BlurView
-              intensity={90}
-              tint={isDark ? "dark" : "light"}
+              intensity={80}
+              tint={isDark ? "dark" : "systemChromeMaterial"}
               style={StyleSheet.absoluteFill}
             />
-          ) : isWeb ? (
+          ) : (
             <View
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: colors.card },
-              ]}
+              style={[StyleSheet.absoluteFill, { backgroundColor: colors.card }]}
             />
-          ) : null,
+          ),
       }}
     >
       <Tabs.Screen
@@ -86,9 +82,9 @@ function ClassicTabLayout() {
           headerShown: false,
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="house" tintColor={color} size={24} />
+              <SymbolView name="house" tintColor={color} size={22} />
             ) : (
-              <Feather name="home" size={22} color={color} />
+              <Feather name="home" size={21} color={color} />
             ),
         }}
       />
@@ -98,9 +94,9 @@ function ClassicTabLayout() {
           title: strings.tabs.favorites,
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="star" tintColor={color} size={24} />
+              <SymbolView name="star" tintColor={color} size={22} />
             ) : (
-              <Feather name="star" size={22} color={color} />
+              <Feather name="star" size={21} color={color} />
             ),
         }}
       />
@@ -110,9 +106,9 @@ function ClassicTabLayout() {
           title: strings.tabs.settings,
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="gearshape" tintColor={color} size={24} />
+              <SymbolView name="gearshape" tintColor={color} size={22} />
             ) : (
-              <Feather name="settings" size={22} color={color} />
+              <Feather name="settings" size={21} color={color} />
             ),
         }}
       />
@@ -121,8 +117,6 @@ function ClassicTabLayout() {
 }
 
 export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
+  if (isLiquidGlassAvailable()) return <NativeTabLayout />;
   return <ClassicTabLayout />;
 }

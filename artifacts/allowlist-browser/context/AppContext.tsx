@@ -16,11 +16,25 @@ export interface Favorite {
   addedAt: number;
 }
 
-export type DomainStatus = "allowed" | "blacklisted" | "pending" | "not_approved";
+export type DomainStatus =
+  | "allowed"
+  | "blacklisted"
+  | "pending"
+  | "not_approved";
 
 export interface DomainClassification {
   status: DomainStatus;
   reason?: string;
+}
+
+export type ReportType = "safe" | "wrong_blacklist" | "wrong_allowlist";
+
+export interface UserReport {
+  id: string;
+  domain: string;
+  type: ReportType;
+  reason: string;
+  timestamp: number;
 }
 
 interface AppContextType {
@@ -33,16 +47,20 @@ interface AppContextType {
   isFavorite: (domain: string) => boolean;
   allowlist: Map<string, string>;
   blacklist: Map<string, string>;
-  reportedDomains: Set<string>;
-  addReported: (domain: string) => void;
+  pendingList: Map<string, string>;
   classifyDomain: (domain: string) => DomainClassification;
-  fetchLists: () => Promise<void>;
+  fetchLists: () => Promise<{ success: boolean; error?: string }>;
   isLoadingLists: boolean;
   lastUpdated: number | null;
   allowlistUrl: string;
   blacklistUrl: string;
+  pendingCsvUrl: string;
+  reportedCsvUrl: string;
   setAllowlistUrl: (url: string) => void;
   setBlacklistUrl: (url: string) => void;
+  userReports: UserReport[];
+  addReport: (domain: string, type: ReportType, reason: string) => void;
+  clearReport: (id: string) => void;
   pendingNavigationUrl: string | null;
   setPendingNavigationUrl: (url: string | null) => void;
 }
@@ -50,23 +68,26 @@ interface AppContextType {
 const STORAGE_KEYS = {
   LANGUAGE: "@ab_language",
   FAVORITES: "@ab_favorites",
-  REPORTED: "@ab_reported",
   ALLOWLIST_CACHE: "@ab_allowlist_cache",
   BLACKLIST_CACHE: "@ab_blacklist_cache",
+  PENDING_CACHE: "@ab_pending_cache",
   LAST_UPDATED: "@ab_last_updated",
   ALLOWLIST_URL: "@ab_allowlist_url",
   BLACKLIST_URL: "@ab_blacklist_url",
+  USER_REPORTS: "@ab_user_reports",
 };
 
-const DEFAULT_ALLOWLIST_URL =
-  "https://raw.githubusercontent.com/Mythso/allowlist-browser-android/main/allowlist.csv";
-const DEFAULT_BLACKLIST_URL =
-  "https://raw.githubusercontent.com/Mythso/allowlist-browser-android/main/blacklist.csv";
+const REPO_BASE =
+  "https://raw.githubusercontent.com/Mythso/allowlist-browser-android/main";
+
+const DEFAULT_ALLOWLIST_URL = `${REPO_BASE}/allowlist.csv`;
+const DEFAULT_BLACKLIST_URL = `${REPO_BASE}/blacklist.csv`;
+const DEFAULT_PENDING_URL = `${REPO_BASE}/pending.csv`;
+const DEFAULT_REPORTED_URL = `${REPO_BASE}/reported.csv`;
 
 const BUILTIN_ALLOWLIST: Array<{ domain: string; reason: string }> = [
-  { domain: "duckduckgo.com", reason: "Standard søkemotor / Default search engine" },
-  { domain: "wikipedia.org", reason: "Encyklopedi / Encyclopedia" },
-  { domain: "example.com", reason: "Eksempel / Example" },
+  { domain: "duckduckgo.com", reason: "Standard søkemotor" },
+  { domain: "wikipedia.org", reason: "Encyklopedi" },
 ];
 
 function parseCsv(csv: string): Array<{ domain: string; reason: string }> {
@@ -93,6 +114,16 @@ function parseCsv(csv: string): Array<{ domain: string; reason: string }> {
   return result;
 }
 
+async function safeFetch(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (res.ok) return await res.text();
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -102,12 +133,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     new Map(BUILTIN_ALLOWLIST.map(({ domain, reason }) => [domain, reason]))
   );
   const [blacklist, setBlacklist] = useState<Map<string, string>>(new Map());
-  const [reportedDomains, setReportedDomains] = useState<Set<string>>(new Set());
+  const [pendingList, setPendingList] = useState<Map<string, string>>(
+    new Map()
+  );
   const [isLoadingLists, setIsLoadingLists] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [allowlistUrl, setAllowlistUrlState] = useState(DEFAULT_ALLOWLIST_URL);
   const [blacklistUrl, setBlacklistUrlState] = useState(DEFAULT_BLACKLIST_URL);
-  const [pendingNavigationUrl, setPendingNavigationUrl] = useState<string | null>(null);
+  const [userReports, setUserReports] = useState<UserReport[]>([]);
+  const [pendingNavigationUrl, setPendingNavigationUrl] = useState<
+    string | null
+  >(null);
 
   const strings = allStrings[language];
 
@@ -117,32 +153,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const [
           savedLang,
           savedFavorites,
-          savedReported,
           savedAllowlist,
           savedBlacklist,
+          savedPending,
           savedLastUpdated,
           savedAllowlistUrl,
           savedBlacklistUrl,
+          savedReports,
         ] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.LANGUAGE),
           AsyncStorage.getItem(STORAGE_KEYS.FAVORITES),
-          AsyncStorage.getItem(STORAGE_KEYS.REPORTED),
           AsyncStorage.getItem(STORAGE_KEYS.ALLOWLIST_CACHE),
           AsyncStorage.getItem(STORAGE_KEYS.BLACKLIST_CACHE),
+          AsyncStorage.getItem(STORAGE_KEYS.PENDING_CACHE),
           AsyncStorage.getItem(STORAGE_KEYS.LAST_UPDATED),
           AsyncStorage.getItem(STORAGE_KEYS.ALLOWLIST_URL),
           AsyncStorage.getItem(STORAGE_KEYS.BLACKLIST_URL),
+          AsyncStorage.getItem(STORAGE_KEYS.USER_REPORTS),
         ]);
 
         if (savedLang) setLanguageState(savedLang as Language);
         if (savedFavorites) setFavorites(JSON.parse(savedFavorites));
-        if (savedReported)
-          setReportedDomains(new Set(JSON.parse(savedReported)));
-        if (savedAllowlistUrl && !savedAllowlistUrl.includes("YOURUSERNAME"))
-          setAllowlistUrlState(savedAllowlistUrl);
-        if (savedBlacklistUrl && !savedBlacklistUrl.includes("YOURUSERNAME"))
-          setBlacklistUrlState(savedBlacklistUrl);
         if (savedLastUpdated) setLastUpdated(Number(savedLastUpdated));
+        if (
+          savedAllowlistUrl &&
+          !savedAllowlistUrl.includes("YOURUSERNAME")
+        )
+          setAllowlistUrlState(savedAllowlistUrl);
+        if (
+          savedBlacklistUrl &&
+          !savedBlacklistUrl.includes("YOURUSERNAME")
+        )
+          setBlacklistUrlState(savedBlacklistUrl);
+        if (savedReports) setUserReports(JSON.parse(savedReports));
 
         if (savedAllowlist) {
           const entries = JSON.parse(savedAllowlist) as Array<[string, string]>;
@@ -157,6 +200,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             new Map(JSON.parse(savedBlacklist) as Array<[string, string]>)
           );
         }
+        if (savedPending) {
+          setPendingList(
+            new Map(JSON.parse(savedPending) as Array<[string, string]>)
+          );
+        }
       } catch {}
     })();
   }, []);
@@ -169,8 +217,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addFavorite = useCallback((url: string, domain: string) => {
     setFavorites((prev) => {
       if (prev.some((f) => f.domain === domain)) return prev;
-      const id =
-        Date.now().toString() + Math.random().toString(36).slice(2, 9);
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       const next = [{ id, domain, url, addedAt: Date.now() }, ...prev];
       AsyncStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(next)).catch(
         () => {}
@@ -194,13 +241,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [favorites]
   );
 
-  const addReported = useCallback((domain: string) => {
-    setReportedDomains((prev) => {
-      const next = new Set(prev);
-      next.add(domain);
+  const addReport = useCallback(
+    (domain: string, type: ReportType, reason: string) => {
+      const report: UserReport = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        domain,
+        type,
+        reason,
+        timestamp: Date.now(),
+      };
+      setUserReports((prev) => {
+        const next = [report, ...prev];
+        AsyncStorage.setItem(
+          STORAGE_KEYS.USER_REPORTS,
+          JSON.stringify(next)
+        ).catch(() => {});
+        return next;
+      });
+    },
+    []
+  );
+
+  const clearReport = useCallback((id: string) => {
+    setUserReports((prev) => {
+      const next = prev.filter((r) => r.id !== id);
       AsyncStorage.setItem(
-        STORAGE_KEYS.REPORTED,
-        JSON.stringify(Array.from(next))
+        STORAGE_KEYS.USER_REPORTS,
+        JSON.stringify(next)
       ).catch(() => {});
       return next;
     });
@@ -215,28 +282,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (allowlist.has(normalized)) {
         return { status: "allowed", reason: allowlist.get(normalized) };
       }
-      if (reportedDomains.has(normalized)) {
-        return { status: "pending" };
+      if (pendingList.has(normalized)) {
+        return { status: "pending", reason: pendingList.get(normalized) };
+      }
+      const localPending = userReports.find(
+        (r) => r.domain === normalized && r.type === "safe"
+      );
+      if (localPending) {
+        return { status: "pending", reason: localPending.reason };
       }
       return { status: "not_approved" };
     },
-    [allowlist, blacklist, reportedDomains]
+    [allowlist, blacklist, pendingList, userReports]
   );
 
   const fetchLists = useCallback(async () => {
     setIsLoadingLists(true);
+    let anySuccess = false;
     try {
-      const [allowlistRes, blacklistRes] = await Promise.allSettled([
-        fetch(allowlistUrl),
-        fetch(blacklistUrl),
+      const [allowText, blackText, pendingText] = await Promise.all([
+        safeFetch(allowlistUrl),
+        safeFetch(blacklistUrl),
+        safeFetch(DEFAULT_PENDING_URL),
       ]);
 
-      if (
-        allowlistRes.status === "fulfilled" &&
-        allowlistRes.value.ok
-      ) {
-        const text = await allowlistRes.value.text();
-        const entries = parseCsv(text);
+      if (allowText !== null) {
+        const entries = parseCsv(allowText);
         const map = new Map<string, string>(
           BUILTIN_ALLOWLIST.map(({ domain, reason }) => [domain, reason])
         );
@@ -246,14 +317,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           STORAGE_KEYS.ALLOWLIST_CACHE,
           JSON.stringify(Array.from(map.entries()))
         );
+        anySuccess = true;
       }
 
-      if (
-        blacklistRes.status === "fulfilled" &&
-        blacklistRes.value.ok
-      ) {
-        const text = await blacklistRes.value.text();
-        const entries = parseCsv(text);
+      if (blackText !== null) {
+        const entries = parseCsv(blackText);
         const map = new Map<string, string>(
           entries.map(({ domain, reason }) => [domain, reason])
         );
@@ -262,13 +330,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           STORAGE_KEYS.BLACKLIST_CACHE,
           JSON.stringify(Array.from(map.entries()))
         );
+        anySuccess = true;
       }
 
-      const now = Date.now();
-      setLastUpdated(now);
-      await AsyncStorage.setItem(STORAGE_KEYS.LAST_UPDATED, String(now));
+      if (pendingText !== null) {
+        const entries = parseCsv(pendingText);
+        const map = new Map<string, string>(
+          entries.map(({ domain, reason }) => [domain, reason])
+        );
+        setPendingList(map);
+        await AsyncStorage.setItem(
+          STORAGE_KEYS.PENDING_CACHE,
+          JSON.stringify(Array.from(map.entries()))
+        );
+      }
+
+      if (anySuccess) {
+        const now = Date.now();
+        setLastUpdated(now);
+        await AsyncStorage.setItem(STORAGE_KEYS.LAST_UPDATED, String(now));
+      }
     } catch {}
     setIsLoadingLists(false);
+    return {
+      success: anySuccess,
+      error: anySuccess ? undefined : "Kunne ikke hente lister",
+    };
   }, [allowlistUrl, blacklistUrl]);
 
   const setAllowlistUrl = useCallback((url: string) => {
@@ -297,16 +384,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         isFavorite,
         allowlist,
         blacklist,
-        reportedDomains,
-        addReported,
+        pendingList,
         classifyDomain,
         fetchLists,
         isLoadingLists,
         lastUpdated,
         allowlistUrl,
         blacklistUrl,
+        pendingCsvUrl: DEFAULT_PENDING_URL,
+        reportedCsvUrl: DEFAULT_REPORTED_URL,
         setAllowlistUrl,
         setBlacklistUrl,
+        userReports,
+        addReport,
+        clearReport,
         pendingNavigationUrl,
         setPendingNavigationUrl,
       }}

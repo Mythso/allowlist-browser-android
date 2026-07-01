@@ -27,56 +27,67 @@ export default function SettingsScreen() {
     lastUpdated,
     allowlist,
     blacklist,
-    reportedDomains,
+    pendingList,
     allowlistUrl,
     blacklistUrl,
     setAllowlistUrl,
     setBlacklistUrl,
     favorites,
+    userReports,
+    addReport,
+    clearReport,
   } = useAppContext();
+
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const [updateMsg, setUpdateMsg] = useState<string | null>(null);
-  const [localAllowlistUrl, setLocalAllowlistUrl] = useState(allowlistUrl);
-  const [localBlacklistUrl, setLocalBlacklistUrl] = useState(blacklistUrl);
 
-  const bottomPad =
-    Platform.OS === "web" ? Math.max(insets.bottom, 34) : insets.bottom;
+  const [localAllowUrl, setLocalAllowUrl] = useState(allowlistUrl);
+  const [localBlackUrl, setLocalBlackUrl] = useState(blacklistUrl);
+  const [updateMsg, setUpdateMsg] = useState<string | null>(null);
+
+  const [reportUrl, setReportUrl] = useState("");
+  const [reportReason, setReportReason] = useState("");
+  const [reportMsg, setReportMsg] = useState<string | null>(null);
+
+  const bottomPad = Platform.OS === "web" ? Math.max(insets.bottom, 34) : insets.bottom;
 
   const handleUpdate = async () => {
     setUpdateMsg(null);
-    setAllowlistUrl(localAllowlistUrl);
-    setBlacklistUrl(localBlacklistUrl);
-    try {
-      await fetchLists();
-      setUpdateMsg(strings.settings.updateSuccess);
-    } catch {
-      setUpdateMsg(strings.settings.updateFailed);
-    }
-    setTimeout(() => setUpdateMsg(null), 3000);
+    setAllowlistUrl(localAllowUrl);
+    setBlacklistUrl(localBlackUrl);
+    const res = await fetchLists();
+    setUpdateMsg(
+      res.success ? strings.settings.updateSuccess : strings.settings.updateFailed
+    );
+    setTimeout(() => setUpdateMsg(null), 4000);
   };
 
   const handleExport = async () => {
-    const text = favorites
-      .map((f) => `${f.domain} — ${f.url}`)
-      .join("\n");
+    const text = favorites.map((f) => `${f.domain} — ${f.url}`).join("\n");
     if (Platform.OS === "web") {
-      Alert.alert(strings.favorites.exportTitle, text || "(ingen)");
+      Alert.alert(strings.favorites.exportTitle, text || "—");
     } else {
-      await Clipboard.setStringAsync(text);
+      await Clipboard.setStringAsync(text || "—");
       Alert.alert(strings.favorites.exportTitle, strings.favorites.exportDone);
     }
   };
 
-  const formatDate = (ts: number | null): string => {
+  const handleReportAllowlisted = () => {
+    const domain = reportUrl.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "").toLowerCase();
+    if (!domain) return;
+    addReport(domain, "wrong_allowlist", reportReason.trim());
+    setReportUrl("");
+    setReportReason("");
+    setReportMsg(strings.settings.reportSuccess);
+    setTimeout(() => setReportMsg(null), 3000);
+  };
+
+  const fmtDate = (ts: number | null) => {
     if (!ts) return strings.settings.never;
-    const d = new Date(ts);
-    return d.toLocaleDateString(language === "no" ? "nb-NO" : "en-US", {
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return new Date(ts).toLocaleDateString(
+      language === "no" ? "nb-NO" : "en-US",
+      { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }
+    );
   };
 
   return (
@@ -89,324 +100,423 @@ export default function SettingsScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* Language */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
-          {strings.settings.languageSection}
-        </Text>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.langRow}>
-            {(["no", "en"] as const).map((lang) => {
-              const label =
-                lang === "no"
-                  ? strings.settings.languageNorwegian
-                  : strings.settings.languageEnglish;
-              const isActive = language === lang;
-              return (
-                <TouchableOpacity
-                  key={lang}
+      <Section label={strings.settings.languageSection} colors={colors}>
+        <Row colors={colors}>
+          {(["no", "en"] as const).map((lang, i) => {
+            const active = language === lang;
+            const label = lang === "no" ? strings.settings.languageNorwegian : strings.settings.languageEnglish;
+            return (
+              <TouchableOpacity
+                key={lang}
+                onPress={() => setLanguage(lang)}
+                style={[
+                  styles.langBtn,
+                  i === 0 && styles.langBtnLeft,
+                  i === 1 && styles.langBtnRight,
+                  active
+                    ? { backgroundColor: colors.primary }
+                    : { backgroundColor: colors.secondary },
+                ]}
+                activeOpacity={0.7}
+              >
+                <Text
                   style={[
-                    styles.langBtn,
-                    isActive && { backgroundColor: colors.primary },
-                    !isActive && { backgroundColor: colors.secondary },
+                    styles.langBtnText,
+                    {
+                      color: active ? "#fff" : colors.mutedForeground,
+                      fontFamily: active ? "Inter_600SemiBold" : "Inter_400Regular",
+                    },
                   ]}
-                  onPress={() => setLanguage(lang)}
-                  activeOpacity={0.7}
                 >
-                  <Text
-                    style={[
-                      styles.langBtnText,
-                      {
-                        color: isActive
-                          ? colors.primaryForeground
-                          : colors.mutedForeground,
-                        fontFamily: isActive
-                          ? "Inter_600SemiBold"
-                          : "Inter_400Regular",
-                      },
-                    ]}
-                  >
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-      </View>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </Row>
+      </Section>
 
       {/* Lists */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
-          {strings.settings.listsSection}
-        </Text>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.field}>
-            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>
-              {strings.settings.allowlistUrl}
-            </Text>
-            <TextInput
-              value={localAllowlistUrl}
-              onChangeText={setLocalAllowlistUrl}
-              style={[
-                styles.fieldInput,
-                {
-                  backgroundColor: colors.background,
-                  borderColor: colors.border,
-                  color: colors.foreground,
-                },
-              ]}
-              placeholder={strings.settings.csvUrlHint}
-              placeholderTextColor={colors.mutedForeground}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-            />
-          </View>
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <View style={styles.field}>
-            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>
-              {strings.settings.blacklistUrl}
-            </Text>
-            <TextInput
-              value={localBlacklistUrl}
-              onChangeText={setLocalBlacklistUrl}
-              style={[
-                styles.fieldInput,
-                {
-                  backgroundColor: colors.background,
-                  borderColor: colors.border,
-                  color: colors.foreground,
-                },
-              ]}
-              placeholder={strings.settings.csvUrlHint}
-              placeholderTextColor={colors.mutedForeground}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-            />
-          </View>
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+      <Section label={strings.settings.listsSection} colors={colors}>
+        <FieldRow label={strings.settings.allowlistUrl} colors={colors}>
+          <TextInput
+            value={localAllowUrl}
+            onChangeText={setLocalAllowUrl}
+            style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
+            placeholder={strings.settings.csvUrlHint}
+            placeholderTextColor={colors.mutedForeground}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+          />
+        </FieldRow>
+
+        <Divider colors={colors} />
+
+        <FieldRow label={strings.settings.blacklistUrl} colors={colors}>
+          <TextInput
+            value={localBlackUrl}
+            onChangeText={setLocalBlackUrl}
+            style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
+            placeholder={strings.settings.csvUrlHint}
+            placeholderTextColor={colors.mutedForeground}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+          />
+        </FieldRow>
+
+        <Divider colors={colors} />
+
+        <View style={styles.rowPad}>
           <TouchableOpacity
-            style={[
-              styles.updateBtn,
-              { backgroundColor: colors.primary },
-              isLoadingLists && { opacity: 0.7 },
-            ]}
             onPress={handleUpdate}
             disabled={isLoadingLists}
+            style={[
+              styles.primaryBtn,
+              { backgroundColor: colors.primary, opacity: isLoadingLists ? 0.6 : 1 },
+            ]}
             activeOpacity={0.8}
           >
             {isLoadingLists ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Feather name="refresh-cw" size={16} color="#fff" />
+              <Feather name="refresh-cw" size={15} color="#fff" />
             )}
-            <Text style={styles.updateBtnText}>
-              {isLoadingLists
-                ? strings.settings.updating
-                : strings.settings.updateButton}
+            <Text style={styles.primaryBtnText}>
+              {isLoadingLists ? strings.settings.updating : strings.settings.updateButton}
             </Text>
           </TouchableOpacity>
 
-          {updateMsg && (
-            <Text style={[styles.updateMsg, { color: colors.success }]}>
+          {updateMsg ? (
+            <Text style={[styles.msg, { color: updateMsg.includes("ikke") || updateMsg.includes("not") ? colors.destructive : colors.success }]}>
               {updateMsg}
             </Text>
-          )}
+          ) : null}
 
-          <View style={styles.lastUpdatedRow}>
-            <Feather name="clock" size={13} color={colors.mutedForeground} />
-            <Text style={[styles.lastUpdatedText, { color: colors.mutedForeground }]}>
-              {strings.settings.lastUpdated}: {formatDate(lastUpdated)}
-            </Text>
-          </View>
+          <Text style={[styles.meta, { color: colors.mutedForeground }]}>
+            {strings.settings.lastUpdated}: {fmtDate(lastUpdated)}
+          </Text>
         </View>
-      </View>
+      </Section>
 
       {/* Stats */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
-          {strings.settings.aboutSection}
-        </Text>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.statRow}>
-            <View style={[styles.statDot, { backgroundColor: colors.success }]} />
-            <Text style={[styles.statLabel, { color: colors.foreground }]}>
-              {strings.settings.allowlistCount}
-            </Text>
-            <Text style={[styles.statCount, { color: colors.primary }]}>
-              {allowlist.size}
-            </Text>
-          </View>
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <View style={styles.statRow}>
-            <View style={[styles.statDot, { backgroundColor: colors.destructive }]} />
-            <Text style={[styles.statLabel, { color: colors.foreground }]}>
-              {strings.settings.blacklistCount}
-            </Text>
-            <Text style={[styles.statCount, { color: colors.primary }]}>
-              {blacklist.size}
-            </Text>
-          </View>
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <View style={styles.statRow}>
-            <View style={[styles.statDot, { backgroundColor: colors.pending }]} />
-            <Text style={[styles.statLabel, { color: colors.foreground }]}>
-              {strings.settings.pendingCount}
-            </Text>
-            <Text style={[styles.statCount, { color: colors.primary }]}>
-              {reportedDomains.size}
-            </Text>
-          </View>
-        </View>
-      </View>
+      <Section label={strings.settings.statsSection} colors={colors}>
+        <StatRow label={strings.settings.allowlistCount} value={allowlist.size} dot={colors.success} colors={colors} />
+        <Divider colors={colors} />
+        <StatRow label={strings.settings.blacklistCount} value={blacklist.size} dot={colors.destructive} colors={colors} />
+        <Divider colors={colors} />
+        <StatRow label={strings.settings.pendingCount} value={pendingList.size} dot={colors.pending} colors={colors} />
+      </Section>
 
-      {/* Favorites Export */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
-          {strings.settings.favoritesSection}
-        </Text>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {/* Report allowlisted site */}
+      <Section label={strings.settings.reportSection} colors={colors}>
+        <FieldRow label={strings.settings.reportUrlLabel} colors={colors}>
+          <TextInput
+            value={reportUrl}
+            onChangeText={setReportUrl}
+            style={[styles.input, { color: colors.foreground, borderColor: colors.border }]}
+            placeholder={strings.settings.reportUrlPlaceholder}
+            placeholderTextColor={colors.mutedForeground}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+          />
+        </FieldRow>
+
+        <Divider colors={colors} />
+
+        <FieldRow label={strings.settings.reportReasonLabel} colors={colors}>
+          <TextInput
+            value={reportReason}
+            onChangeText={setReportReason}
+            style={[styles.input, styles.multiInput, { color: colors.foreground, borderColor: colors.border }]}
+            placeholder={strings.settings.reportReasonPlaceholder}
+            placeholderTextColor={colors.mutedForeground}
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+          />
+        </FieldRow>
+
+        <Divider colors={colors} />
+
+        <View style={styles.rowPad}>
           <TouchableOpacity
-            style={[styles.exportBtn, { borderColor: colors.border }]}
+            onPress={handleReportAllowlisted}
+            disabled={!reportUrl.trim()}
+            style={[
+              styles.primaryBtn,
+              { backgroundColor: colors.primary, opacity: reportUrl.trim() ? 1 : 0.5 },
+            ]}
+            activeOpacity={0.8}
+          >
+            <Feather name="flag" size={15} color="#fff" />
+            <Text style={styles.primaryBtnText}>{strings.settings.reportSubmitBtn}</Text>
+          </TouchableOpacity>
+          {reportMsg ? (
+            <Text style={[styles.msg, { color: colors.success }]}>{reportMsg}</Text>
+          ) : null}
+        </View>
+      </Section>
+
+      {/* My reports */}
+      <Section label={strings.settings.myReportsSection} colors={colors}>
+        {userReports.length === 0 ? (
+          <View style={styles.rowPad}>
+            <Text style={[styles.meta, { color: colors.mutedForeground }]}>
+              {strings.settings.noReports}
+            </Text>
+          </View>
+        ) : (
+          userReports.map((r, i) => (
+            <React.Fragment key={r.id}>
+              {i > 0 && <Divider colors={colors} />}
+              <View style={[styles.rowPad, styles.reportRow]}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={[styles.reportDomain, { color: colors.foreground }]}>
+                    {r.domain}
+                  </Text>
+                  <Text style={[styles.meta, { color: colors.mutedForeground }]}>
+                    {strings.settings.reportTypeLabels[r.type]}
+                  </Text>
+                  {r.reason ? (
+                    <Text style={[styles.meta, { color: colors.mutedForeground }]}>
+                      {r.reason}
+                    </Text>
+                  ) : null}
+                </View>
+                <TouchableOpacity
+                  onPress={() => clearReport(r.id)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={[styles.meta, { color: colors.destructive }]}>
+                    {strings.settings.deleteReport}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </React.Fragment>
+          ))
+        )}
+      </Section>
+
+      {/* Favorites */}
+      <Section label={strings.settings.favoritesSection} colors={colors}>
+        <View style={styles.rowPad}>
+          <TouchableOpacity
             onPress={handleExport}
+            style={[styles.outlineBtn, { borderColor: colors.border }]}
             activeOpacity={0.7}
           >
-            <Feather name="download" size={18} color={colors.primary} />
-            <Text style={[styles.exportBtnText, { color: colors.primary }]}>
+            <Feather name="download" size={15} color={colors.primary} />
+            <Text style={[styles.outlineBtnText, { color: colors.primary }]}>
               {strings.settings.exportButton}
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </Section>
     </ScrollView>
   );
 }
 
+/* ── Small layout helpers ── */
+
+function Section({
+  label,
+  colors,
+  children,
+}: {
+  label: string;
+  colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.section}>
+      <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+        {label.toUpperCase()}
+      </Text>
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {children}
+      </View>
+    </View>
+  );
+}
+
+function Row({
+  colors,
+  children,
+}: {
+  colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
+  children: React.ReactNode;
+}) {
+  return <View style={styles.rowPad}>{children}</View>;
+}
+
+function FieldRow({
+  label,
+  colors,
+  children,
+}: {
+  label: string;
+  colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={[styles.rowPad, { gap: 6 }]}>
+      <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>
+        {label}
+      </Text>
+      {children}
+    </View>
+  );
+}
+
+function Divider({
+  colors,
+}: {
+  colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
+}) {
+  return (
+    <View
+      style={[styles.divider, { backgroundColor: colors.border }]}
+    />
+  );
+}
+
+function StatRow({
+  label,
+  value,
+  dot,
+  colors,
+}: {
+  label: string;
+  value: number;
+  dot: string;
+  colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
+}) {
+  return (
+    <View style={[styles.rowPad, styles.statRow]}>
+      <View style={[styles.dot, { backgroundColor: dot }]} />
+      <Text style={[styles.statLabel, { color: colors.foreground }]}>{label}</Text>
+      <Text style={[styles.statValue, { color: colors.primary }]}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   content: {
     paddingHorizontal: 16,
-    paddingTop: 8,
-    gap: 24,
+    paddingTop: 16,
+    gap: 28,
   },
-  section: {
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    textTransform: "uppercase",
-    letterSpacing: 1,
+  section: { gap: 6 },
+  sectionLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    letterSpacing: 0.8,
     paddingHorizontal: 4,
   },
   card: {
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
   },
-  langRow: {
-    flexDirection: "row",
-    gap: 8,
-    padding: 12,
+  rowPad: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 14,
   },
   langBtn: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingVertical: 10,
     alignItems: "center",
-  },
-  langBtnText: {
-    fontSize: 15,
-  },
-  field: {
-    padding: 14,
-    gap: 6,
-  },
-  fieldLabel: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    letterSpacing: 0.3,
-  },
-  fieldInput: {
     borderRadius: 8,
+  },
+  langBtnLeft: { marginRight: 4 },
+  langBtnRight: { marginLeft: 4 },
+  langBtnText: { fontSize: 14 },
+  input: {
     borderWidth: 1,
-    paddingHorizontal: 12,
+    borderRadius: 8,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 13,
     fontFamily: "Inter_400Regular",
   },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    marginHorizontal: 14,
+  multiInput: {
+    minHeight: 64,
   },
-  updateBtn: {
+  primaryBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    margin: 14,
-    paddingVertical: 13,
-    borderRadius: 12,
+    gap: 7,
+    paddingVertical: 12,
+    borderRadius: 10,
   },
-  updateBtnText: {
-    fontSize: 15,
+  primaryBtnText: {
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
     color: "#fff",
   },
-  updateMsg: {
-    textAlign: "center",
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    paddingBottom: 10,
-  },
-  lastUpdatedRow: {
+  outlineBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
-    paddingBottom: 12,
+    gap: 7,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
   },
-  lastUpdatedText: {
+  outlineBtnText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  msg: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    textAlign: "center",
+    marginTop: 8,
+  },
+  meta: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
+    marginTop: 6,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
   },
   statRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
     gap: 10,
   },
-  statDot: {
-    width: 8,
-    height: 8,
+  dot: {
+    width: 7,
+    height: 7,
     borderRadius: 4,
   },
   statLabel: {
     flex: 1,
-    fontSize: 15,
-    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
   },
-  statCount: {
-    fontSize: 17,
-    fontFamily: "Inter_700Bold",
-  },
-  exportBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    paddingVertical: 16,
-    borderRadius: 12,
-  },
-  exportBtnText: {
-    fontSize: 15,
+  statValue: {
+    fontSize: 16,
     fontFamily: "Inter_600SemiBold",
   },
-  // Colors not in useColors - inline in constants
-  success: {},
-  pending: {},
+  reportRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  reportDomain: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
 });
